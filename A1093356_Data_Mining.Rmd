@@ -1,0 +1,421 @@
+---
+title: |
+  ![](r-project.svg){width=1in}Data Mining
+author: "Ru"
+date: "2023-06-15"
+output: flexdashboard::flex_dashboard
+source_code: embed
+---
+
+
+```{r setup, include=FALSE}
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+library(lubridate)
+library(arules)
+library(arulesViz)
+
+predelete_dataset <- read_excel("C:/Users/user/Desktop/DG&IR/imdb_movies.xlsx","imdb_movies_adj")
+dataset <- predelete_dataset[complete.cases(predelete_dataset), ]
+#1895-1927movie
+beg_dataset <- dataset %>%  filter(year(date_x)<1927 & year(date_x)>=1895)
+#1927-1960movie
+mid_dataset <- dataset %>%  filter(year(date_x)<1960 & year(date_x)>=1927)
+#1960-1980movie
+midlate_dataset <- dataset %>%  filter(year(date_x)<1980 & year(date_x)>=1960)
+#1980-movie
+recent_dataset <- dataset %>%  filter(year(date_x)<=2023 & year(date_x)>=1980)
+
+asso_beg_dataset <- beg_dataset
+asso_beg_dataset$date_x <- format(asso_beg_dataset$date_x, "%Y-%m-%d")
+asso_beg_dataset$date_x <- 'Early'
+#summary(asso_beg_dataset$revenue)
+for (i in 1:nrow(asso_beg_dataset)) {
+  if (asso_beg_dataset$revenue[i] >= 4.164e+08) {
+    asso_beg_dataset$revenue[i] <- "High"
+  }else if (asso_beg_dataset$revenue[i] >= 2.517e+08){
+    asso_beg_dataset$revenue[i] <- "Normal"
+  }else{
+    asso_beg_dataset$revenue[i] <- "Low"
+  }
+}
+asso_beg_dataset_apr <- data.frame(date=factor(asso_beg_dataset$date_x),
+                                   genre=factor(asso_beg_dataset$genre),
+                                   revenue=factor(asso_beg_dataset$revenue))
+
+
+asso_mid_dataset <- mid_dataset
+asso_mid_dataset$date_x <- format(asso_mid_dataset$date_x, "%Y-%m-%d")
+asso_mid_dataset$date_x <- 'Middle'
+for (i in 1:nrow(asso_mid_dataset)) {
+  if (asso_mid_dataset$revenue[i] >= 4.164e+08) {
+    asso_mid_dataset$revenue[i] <- "High"
+  }else if (asso_mid_dataset$revenue[i] >= 2.517e+08){
+    asso_mid_dataset$revenue[i] <- "Normal"
+  }else{
+    asso_mid_dataset$revenue[i] <- "Low"
+  }
+}
+asso_mid_dataset_apr <- data.frame(date=factor(asso_mid_dataset$date_x),
+                                   genre=factor(asso_mid_dataset$genre),
+                                   revenue=factor(asso_mid_dataset$revenue))
+
+
+asso_midlate_dataset <- midlate_dataset
+asso_midlate_dataset$date_x <- format(asso_midlate_dataset$date_x, "%Y-%m-%d")
+asso_midlate_dataset$date_x <- 'Middle Late'
+for (i in 1:nrow(asso_midlate_dataset)) {
+  if (asso_midlate_dataset$revenue[i] >= 4.164e+08) {
+    asso_midlate_dataset$revenue[i] <- "High"
+  }else if (asso_midlate_dataset$revenue[i] >= 2.517e+08){
+    asso_midlate_dataset$revenue[i] <- "Normal"
+  }else{
+    asso_midlate_dataset$revenue[i] <- "Low"
+  }
+}
+asso_midlate_dataset_apr <- data.frame(date=factor(asso_midlate_dataset$date_x),
+                                   genre=factor(asso_midlate_dataset$genre),
+                                   revenue=factor(asso_midlate_dataset$revenue))
+
+
+asso_recent_dataset <- recent_dataset
+asso_recent_dataset$date_x <- format(asso_recent_dataset$date_x, "%Y-%m-%d")
+asso_recent_dataset$date_x <- 'Recent'
+for (i in 1:nrow(asso_recent_dataset)) {
+  if (asso_recent_dataset$revenue[i] >= 4.164e+08) {
+    asso_recent_dataset$revenue[i] <- "High"
+  }else if (asso_recent_dataset$revenue[i] >= 2.517e+08){
+    asso_recent_dataset$revenue[i] <- "Normal"
+  }else{
+    asso_recent_dataset$revenue[i] <- "Low"
+  }
+}
+asso_recent_dataset_apr <- data.frame(date=factor(asso_recent_dataset$date_x),
+                                       genre=factor(asso_recent_dataset$genre),
+                                       revenue=factor(asso_recent_dataset$revenue))
+
+
+
+
+
+asso_dataset <- rbind(asso_beg_dataset, asso_mid_dataset, asso_midlate_dataset, asso_recent_dataset)
+for (i in 1:nrow(asso_dataset)) {
+  if (asso_dataset$revenue[i] >= 4.164e+08) {
+    asso_dataset$revenue[i] <- "High"
+  }else if (asso_dataset$revenue[i] >= 2.517e+08){
+    asso_dataset$revenue[i] <- "Normal"
+  }else{
+    asso_dataset$revenue[i] <- "Low"
+  }
+}
+
+asso_dataset_apr <- data.frame(date=factor(asso_dataset$date_x),
+                               genre=factor(asso_dataset$genre),
+                               revenue=factor(asso_dataset$revenue))
+
+
+
+# Get the counts of each genre
+genre_counts <- data.frame(dataset$genre)
+
+# Get the unique genres with non-zero counts and select the top 10 genres
+top_genres_count <- genre_counts %>% 
+  group_by(dataset.genre) %>% 
+  summarise(Count_t=n()) %>% 
+  arrange(desc(Count_t)) %>%
+  head(10)
+
+# Create a data frame with genre names and their corresponding explode values
+data <- data.frame(genre = top_genres_count$dataset.genre, count = top_genres_count$Count_t)
+data$percentage <- (data$count / sum(data$count)) * 100
+
+movie_years <- dataset %>%
+  mutate(year = lubridate::year(date_x)) %>%
+  count(year) %>%
+  arrange(year)
+
+movie_counts <- table(format(dataset$date_x, "%Y"))
+
+# Convert the table to a data frame and sort by year
+movie_counts <- data.frame(Year = as.numeric(names(movie_counts)),
+                           Count = as.numeric(movie_counts))
+movie_counts <- movie_counts[order(movie_counts$Year), ]
+
+# Calculate the correlation matrix
+cor_matrix <- cor(dataset[c("revenue", "score", "budget_x")])
+early_cor_matrix <- cor(beg_dataset[c("revenue", "score", "budget_x")])
+mid_cor_matrix <- cor(mid_dataset[c("revenue", "score", "budget_x")])
+midlate_cor_matrix <- cor(midlate_dataset[c("revenue", "score", "budget_x")])
+recent_cor_matrix <- cor(recent_dataset[c("revenue", "score", "budget_x")])
+
+
+# Sort the data frame by revenue in ascending order and take top 20
+Movies_sorted <- dataset[order(dataset$revenue), ]
+top_20_revenues <- tail(Movies_sorted, 20)
+
+# asso
+transaction <- transactions(asso_beg_dataset_apr)
+
+early_rule <- apriori(transaction,
+                parameter=list(support=0.1,
+                               confidence=0.5,
+                               minlen=3),
+                appearance = list(default="lhs",
+                                  rhs=c("revenue=High", "revenue=Normal","revenue=Low"))
+)
+
+transaction <- transactions(asso_mid_dataset_apr)
+
+middle_rule <- apriori(transaction,
+                parameter=list(support=0.02,
+                               confidence=0.5,
+                               minlen=3),
+                appearance = list(default="lhs",
+                                  rhs=c("revenue=High", "revenue=Normal","revenue=Low"))
+)
+
+transaction <- transactions(asso_midlate_dataset_apr)
+
+midlate_rule <- apriori(transaction,
+                parameter=list(support=0.005,
+                               confidence=0.5,
+                               minlen=3),
+                appearance = list(default="lhs",
+                                  rhs=c("revenue=High", "revenue=Normal","revenue=Low"))
+)
+
+transaction <- transactions(asso_recent_dataset_apr)
+
+recent_rule <- apriori(transaction,
+                parameter=list(support=0.001,
+                               confidence=0.5,
+                               minlen=3),
+                appearance = list(default="lhs",
+                                  rhs=c("revenue=High", "revenue=Normal","revenue=Low"))
+)
+
+
+
+
+```
+
+Introduction of overall dataset
+=======================================================================
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### line chart about movies produced
+```{r}
+
+ggplot(movie_counts, aes(x = Year, y = Count)) +
+  geom_line(color = "red", size = 1.8) +
+  labs(title = "Movies Produced per Year Since 1903-2023") +
+  annotate("rect", xmin = 1895, xmax = 1927, ymin = -Inf, ymax = Inf, fill = "#81C0C0", alpha = 0.3)+
+  annotate("rect", xmin = 1927, xmax = 1960, ymin = -Inf, ymax = Inf, fill = "#9999CC", alpha = 0.3)+
+  annotate("rect", xmin = 1960, xmax = 1980, ymin = -Inf, ymax = Inf, fill = "#C48888", alpha = 0.3)+
+  annotate("rect", xmin = 1980, xmax = 2023, ymin = -Inf, ymax = Inf, fill = "#ADADAD", alpha = 0.3)+
+  theme_minimal()
+
+```
+
+### bar plot of top 20 movie revenues since 1903-2023
+```{r}
+
+ggplot(top_20_revenues, aes(x = reorder(names, revenue), y = revenue)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(title = "Top 20 Movie Revenues", x = "Movie Title", y = "Revenue") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+```
+
+
+### pie chart of top 10 genres of movies
+```{r}
+
+ggplot(data, aes(x = "", y = percentage, fill = genre)) +
+  geom_col(width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "Top 10 Genre of Movies Since 1903-2023") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), position = position_stack(vjust = 0.5)) +
+  guides(fill = guide_legend(title = "Category"))
+
+```
+
+Correlation of overall data
+=======================================================================
+
+### Heatmap of correlation between Revenue vs Score vs Budget
+```{r}
+
+ggplot(melt(cor_matrix), aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "blue")) +
+  geom_text(aes(Var2, Var1, label = value), size = 3) +
+  labs(title = "Correlation between Revenue vs Score vs Budget") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+Correlation of each period data
+=======================================================================
+
+Row
+-------------------------------------
+    
+### Heatmap of correlation between Revenue vs Score vs Budget(1895-1927)
+```{r}
+ggplot(melt(early_cor_matrix), aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "blue")) +
+  geom_text(aes(Var2, Var1, label = value), size = 3) +
+  labs(title = "Correlation between Revenue vs Score vs Budget") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Heatmap of correlation between Revenue vs Score vs Budget(1927-1960)
+```{r}
+
+ggplot(melt(mid_cor_matrix), aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "blue")) +
+  geom_text(aes(Var2, Var1, label = value), size = 3) +
+  labs(title = "Correlation between Revenue vs Score vs Budget") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+   
+Row 
+-------------------------------------
+ 
+### Heatmap of correlation between Revenue vs Score vs Budget(1960-1980)
+```{r}
+
+ggplot(melt(midlate_cor_matrix), aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "blue")) +
+  geom_text(aes(Var2, Var1, label = value), size = 3) +
+  labs(title = "Correlation between Revenue vs Score vs Budget") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+### Heatmap of correlation between Revenue vs Score vs Budget(1980-2023)
+```{r}
+
+ggplot(melt(recent_cor_matrix), aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "blue")) +
+  geom_text(aes(Var2, Var1, label = value), size = 3) +
+  labs(title = "Correlation between Revenue vs Score vs Budget") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+Association between period, genres and revenue (1895-1927) 
+=======================================================================
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+    
+### Association map in early data
+```{r}
+
+plot(head(sort(early_rule,
+               by="lift"),
+          n=10),
+     method="graph",
+     engine="htmlwidget")
+```
+
+### Association inspect in early data
+
+```{r}
+
+inspect(head(sort(early_rule,by="lift"),10))
+
+```
+
+Association between period, genres and revenue (1927-1960) 
+=======================================================================
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Association map in maiddle data
+```{r}
+
+plot(head(sort(middle_rule,
+               by="lift"),
+          n=10),
+     method="graph",
+     engine="htmlwidget")
+
+```
+ 
+### Association inspect in maiddle data
+```{r}
+
+inspect(head(sort(middle_rule,by="lift"),10))
+
+```
+
+
+Association between period, genres and revenue (1960-1980) 
+=======================================================================
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Association map in maiddle-late data
+```{r}
+
+
+plot(head(sort(midlate_rule,
+               by="lift"),
+          n=10),
+     method="graph",
+     engine="htmlwidget")
+
+```
+ 
+### Association inspect in maiddle-late data
+```{r}
+
+inspect(head(sort(midlate_rule,by="lift"),10))
+
+```
+
+
+Association between period, genres and revenue (1980-2023) 
+=======================================================================
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Association map in recent data
+```{r}
+
+plot(head(sort(recent_rule,
+               by="lift"),
+          n=10),
+     method="graph",
+     engine="htmlwidget")
+```
+ 
+### Association inspect in recent data
+```{r}
+
+inspect(head(sort(recent_rule,by="lift"),10))
+
+```
+
